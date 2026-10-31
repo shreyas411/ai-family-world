@@ -2,6 +2,10 @@
 
 A persistent, autonomous simulation of a five-member Indian family (Rajesh, Lakshmi, Arjun, Priya, Anu) with a live 2D dashboard and a 3D house view.
 
+[![AI Family World demo](docs/demo.gif)](docs/demo.mp4)
+
+*Click the preview to watch the full video with sound ([docs/demo.mp4](docs/demo.mp4)).*
+
 ## Purpose
 
 Watch AI agents live believable family life: they follow daily routines, juggle tasks and deadlines, talk, argue and make up, remember what happened, and learn from it day by day. You step in as the "controller" by giving instructions, assigning tasks or triggering events, and you see how each member reacts based on their personality, mood and relationships. Use it as a sandbox for agent behaviour, emergent storytelling, or as a reference for keeping an LLM-backed simulation cheap, reproducible and bounded.
