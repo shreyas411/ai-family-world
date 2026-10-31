@@ -1,0 +1,4 @@
+{
+  "_comment": "Optional real assets. Map a member id to a rigged GLB (e.g. \"father\": \"/3d/models/father.glb\"). Clips named idle, walk, sit, sleep, talk, cook, eat, study... are played by name; anything missing falls back to idle/sit. Members not listed use the built-in procedural model.",
+  "characters": {}
+}

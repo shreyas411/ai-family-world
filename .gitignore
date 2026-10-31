@@ -1,0 +1,7 @@
+.venv/
+world.db
+__pycache__/
+web3d/node_modules/
+server.log
+.DS_Store
+.env

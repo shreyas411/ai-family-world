@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Family World</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#f3f2ef; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#8a8984; --line:#e2e0da;
+          --accent:#2a78d6; --bad:#e34948; --good:#1baf7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--line);
+           position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0 8px 0 0; }
+  .clock { font-variant-numeric:tabular-nums; font-weight:600; font-size:16px; min-width:150px; }
+  button, select, input, textarea { font:inherit; }
+  button { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 10px; cursor:pointer; }
+  button:hover { border-color:var(--ink2); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.danger { color:var(--bad); }
+  select, input, textarea { border:1px solid var(--line); border-radius:6px; padding:5px 8px; background:#fff; }
+  .pill { padding:2px 8px; border-radius:999px; background:#eceae4; color:var(--ink2); font-size:12px; }
+  .pill.on { background:#dcebfb; color:#164a87; }
+  main { display:grid; grid-template-columns:minmax(0, 1fr) 380px; gap:12px; padding:12px 16px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .card h2 { font-size:14px; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  .toolbar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  canvas { width:100%; border-radius:8px; display:block; background:#e9e6df; }
+  #feed { height:600px; overflow:auto; font-size:13px; }
+  .ev { padding:3px 0; border-bottom:1px dashed #eee; }
+  .ev time { color:var(--muted); font-variant-numeric:tabular-nums; margin-right:6px; }
+  .ev.talk { color:#164a87; } .ev.event { color:#8a4b00; font-weight:500; } .ev.controller { color:#5b3fb8; }
+  .ev.learning { color:#0b6b48; } .ev.move { color:var(--muted); }
+  nav.tabs { display:flex; gap:4px; padding:0 16px; flex-wrap:wrap; }
+  nav.tabs button { border-radius:8px 8px 0 0; border-bottom:none; }
+  nav.tabs button.active { background:var(--surface); font-weight:600; }
+  section.tab { display:none; margin:0 16px 24px; } section.tab.active { display:block; }
+  .grid5 { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; }
+  .member .top { display:flex; gap:10px; align-items:center; }
+  .avatar { width:44px; height:44px; border-radius:50%; display:grid; place-items:center; font-size:24px; border:3px solid; }
+  .kv { font-size:13px; color:var(--ink2); margin-top:4px; }
+  .kv b { color:var(--ink); font-weight:500; }
+  .bar { height:7px; background:#eceae4; border-radius:4px; overflow:hidden; margin:3px 0 6px; }
+  .bar > i { display:block; height:100%; background:var(--accent); }
+  .thought { font-size:12px; color:var(--ink2); background:#f6f5f1; border-radius:6px; padding:6px; margin-top:6px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--ink2); font-weight:500; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .conv { border:1px solid var(--line); border-radius:8px; padding:8px; margin-bottom:8px; background:#fff; }
+  .conv .meta { font-size:12px; color:var(--muted); }
+  .line { margin:2px 0; } .line b { font-weight:600; }
+  details summary { cursor:pointer; color:var(--ink2); font-size:12px; }
+  pre { white-space:pre-wrap; font-size:12px; background:#f6f5f1; padding:8px; border-radius:6px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  .chart { position:relative; }
+  .tip { position:absolute; pointer-events:none; background:#fff; border:1px solid var(--line); border-radius:6px;
+         padding:6px 8px; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,.08); display:none; white-space:nowrap; z-index:3; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+  .legend { display:flex; gap:12px; font-size:12px; color:var(--ink2); flex-wrap:wrap; margin:4px 0; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .mem h3 { font-size:13px; margin:10px 0 4px; }
+  .mem li { font-size:13px; margin-bottom:2px; } .mem li time { color:var(--muted); margin-right:6px; }
+  #report h1 { font-size:20px; } #report h2 { font-size:16px; margin-top:16px; } #report h3 { font-size:14px; }
+  .note { font-size:12px; color:var(--muted); }
+  #story { display:none; margin-top:10px; }
+  #storyList { max-height:320px; overflow:auto; font-size:13px; }
+  .mo { padding:5px 6px; border-radius:6px; cursor:pointer; border-left:3px solid transparent; }
+  .mo:hover { background:#f6f5f1; } .mo.cur { background:#eef4fc; border-left-color:#2a78d6; }
+  .mo time { color:var(--muted); font-variant-numeric:tabular-nums; margin-right:6px; }
+  .mo .why { color:var(--ink2); font-size:12px; }
+  .fight { border:1px solid var(--line); border-radius:8px; padding:6px 8px; margin-bottom:6px; background:#fff; font-size:13px; }
+  @media (max-width: 1100px) { main { grid-template-columns:1fr; } .two { grid-template-columns:1fr; } }
+  @media print { body * { visibility:hidden; } #report, #report * { visibility:visible; } #report { position:absolute; left:0; top:0; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 AI Family World</h1>
+  <span class="clock" id="clock">—</span>
+  <span class="pill" id="status">paused</span>
+  <button class="primary" onclick="ctl('start')">▶ Start</button>
+  <button onclick="ctl('pause')">⏸ Pause</button>
+  <button onclick="ctl('resume')">⏯ Resume</button>
+  <button onclick="ctl('stop')">⏹ Stop</button>
+  <button onclick="ctl('step')" title="Advance one tick (10 simulated minutes)">+10 min</button>
+  <label>Speed <select id="speed" onchange="post('/api/settings',{speed:+this.value})">
+    <option value="3">slow (3 s/tick)</option><option value="1">normal (1 s/tick)</option>
+    <option value="0.4">fast</option><option value="0.1">very fast</option><option value="0.05">max</option></select></label>
+  <span class="pill" id="llm" title="LLM status and spend">LLM</span>
+  <span style="flex:1"></span>
+  <input id="quick" placeholder="Say something to the family… (Enter)" style="width:340px"
+         onkeydown="if(event.key==='Enter'){instruct(this.value,'');this.value=''}">
+</header>
+
+<main>
+  <div class="card">
+    <h2>Virtual house <span class="note" id="vizmode">live</span></h2>
+    <div class="toolbar">
+      <a href="/3d/" style="padding:5px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit;background:#eef4fc">🏠 Open 3D house</a>
+      <button id="replayBtn" onclick="toggleReplay()">⏮ Replay a day</button>
+      <span id="replayCtl" style="display:none" class="row">
+        <select id="replayDay" onchange="loadReplay()"></select>
+        <button id="playBtn" onclick="replayPlaying=!replayPlaying;this.textContent=replayPlaying?'⏸':'▶'">▶</button>
+        <input type="range" id="scrub" min="0" max="0" value="0" style="width:260px" oninput="replayIdx=+this.value">
+        <span id="replayTime" class="note"></span>
+      </span>
+      <span style="flex:1"></span>
+      <button onclick="screenshot()">📷 Screenshot</button>
+      <button id="recBtn" onclick="toggleRecord()">⏺ Record video</button>
+    </div>
+    <canvas id="house" width="960" height="560"></canvas>
+    <div class="note" style="margin-top:6px">The picture is a schematic drawing of the simulation's recorded state: who is where, what they're doing,
+      their dominant emotion, and what they said. The art is illustrative; the actions and words are the simulation's actual output.</div>
+    <div id="story">
+      <h2>Story of the day <label class="note"><input type="checkbox" id="keyOnly" checked onchange="renderStory()"> key moments only</label>
+        <span class="note">Click a moment to jump there.</span></h2>
+      <div id="fights"></div>
+      <div id="storyList"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Live activity feed <label class="note"><input type="checkbox" id="hideMoves" checked onchange="renderFeed()"> hide movement</label></h2>
+    <div id="feed"></div>
+  </div>
+</main>
+
+<nav class="tabs" id="tabs"></nav>
+
+<section class="tab" id="tab-family"><div class="grid5" id="members"></div></section>
+
+<section class="tab" id="tab-conversations"><div class="card">
+  <div class="row"><select id="convAgent" onchange="loadConvs()"><option value="">All members</option></select>
+    <input id="convQ" placeholder="Search conversations…" onkeydown="if(event.key==='Enter')loadConvs()">
+    <button onclick="loadConvs()">Search</button>
+    <span class="note">The controller can see every conversation, including private instructions (🔒). Agents only remember the ones they were part of or overheard.</span></div>
+  <div id="convs"></div></div></section>
+
+<section class="tab" id="tab-emotions"><div class="card">
+  <div class="row">Emotion <select id="emoPick" onchange="loadEmotionChart()"></select>
+    <span class="note">Intensity 0–1 over the last 3 simulated days, sampled every 30 minutes.</span></div>
+  <div class="chart" id="emoChart"></div>
+  <h2 style="margin-top:12px">Current emotional state</h2>
+  <div id="emoTable" style="overflow:auto"></div></div></section>
+
+<section class="tab" id="tab-relationships"><div class="two">
+  <div class="card"><h2>Family relationship graph</h2>
+    <div class="legend"><span><span class="sw" style="background:#2a78d6"></span>warm (affection − frustration high)</span>
+      <span><span class="sw" style="background:#b8b6ae"></span>neutral</span><span><span class="sw" style="background:#e34948"></span>tense</span>
+      <span>line width = closeness · arrow = how one member feels about another</span></div>
+    <div class="chart" id="relGraph"></div></div>
+  <div class="card"><h2>Relationship history</h2>
+    <div class="row">How <select id="relFrom" onchange="loadRelChart()"></select> feels about others:
+      <select id="relKey" onchange="loadRelChart()"></select></div>
+    <div class="chart" id="relChart"></div>
+    <h2 style="margin-top:12px">Conflicts</h2><div id="conflicts"></div></div>
+</div>
+<div class="card" style="margin-top:12px"><h2>All relationships (directed)</h2><div id="relTable" style="overflow:auto"></div></div></section>
+
+<section class="tab" id="tab-tasks">
+  <div class="card"><h2>Productivity by member</h2><div id="taskSummary"></div></div>
+  <div class="card" style="margin-top:12px"><h2>Said vs did <span class="note">What members claimed about their tasks, checked against the task's real progress
+    when it finished or hit its deadline.</span></h2><div id="claims"></div></div>
+  <div class="card" style="margin-top:12px"><h2>Self-improvement (measured)</h2><div id="improve"></div></div>
+  <div class="card" style="margin-top:12px"><h2>Tasks</h2>
+    <div class="row"><select id="taskAgent" onchange="renderTasks()"><option value="">All members</option></select>
+      <select id="taskStatus" onchange="renderTasks()"><option value="">Any status</option><option>pending</option><option>overdue soon</option>
+        <option>done</option><option>failed</option></select></div>
+    <div id="taskList"></div></div></section>
+
+<section class="tab" id="tab-memory"><div class="card mem">
+  <div class="row">Member <select id="memAgent" onchange="loadMemory()"></select><button onclick="loadMemory()">Refresh</button>
+    <span class="note">Each agent's memory is separate. Nobody knows anything they weren't told and didn't see.</span></div>
+  <div id="memory"></div></div></section>
+
+<section class="tab" id="tab-reports"><div class="card">
+  <div class="row">Day <select id="repDay" onchange="loadReport()"></select>
+    <button onclick="dl('md')">Markdown</button><button onclick="dl('json')">JSON</button><button onclick="dl('csv')">CSV</button>
+    <button onclick="window.print()">PDF (print)</button>
+    <span class="note">A report is written automatically at midnight of every simulated day. PDF uses your browser's Save as PDF.</span></div>
+  <div id="report"></div></div></section>
+
+<section class="tab" id="tab-control"><div class="two">
+  <div class="card"><h2>Instructions</h2>
+    <div class="row"><select id="instTarget"><option value="">Everyone (broadcast)</option></select>
+      <span class="note">Choose one member to send a private message.</span></div>
+    <textarea id="instText" rows="3" style="width:100%" placeholder="e.g. Arjun, you have an important assignment. Complete it before playing games."></textarea>
+    <div class="row"><button class="primary" onclick="instruct(instText.value, instTarget.value);instText.value=''">Send</button></div>
+    <div class="row" id="examples"></div>
+    <p class="note">Members decide for themselves how to act on instructions. They may agree, negotiate, or push back, depending on personality, mood and workload.</p>
+    <h2>Assign a responsibility</h2>
+    <div class="row"><select id="taskOwner"></select><input id="taskTitle" placeholder="Task title" style="flex:1">
+      <select id="taskKind"><option>general</option><option>academic</option><option>household</option><option>finance</option>
+        <option>creative</option><option>learning</option><option>work</option><option>care</option></select></div>
+    <div class="row">Priority <input id="taskPrio" type="number" min="1" max="5" value="3" style="width:60px">
+      Due in <input id="taskDue" type="number" value="6" style="width:60px"> h
+      Effort <input id="taskEffort" type="number" value="4" style="width:60px"> ×10 min
+      <button onclick="assignTask()">Assign</button></div>
+  </div>
+  <div class="card"><h2>World</h2>
+    <div class="row">Set clock: Day <input id="setDay" type="number" min="1" style="width:70px">
+      <input id="setTime" type="time" step="600"> <button onclick="setClock()">Set</button></div>
+    <h2>Unexpected events</h2><div class="row" id="eventBtns"></div>
+    <div class="row"><input id="customEvent" placeholder="Custom event, e.g. Grandmother is coming to stay for a week" style="flex:1">
+      <button onclick="post('/api/event',{kind:'custom',text:customEvent.value});customEvent.value=''">Trigger</button></div>
+    <h2>Scenarios</h2><div class="row" id="scenarioBtns"></div>
+    <h2>LLM &amp; cost</h2>
+    <div id="llmInfo" class="kv"></div>
+    <div class="row"><label><input type="checkbox" id="llmOn" onchange="post('/api/settings',{llm_enabled:this.checked})"> Use Claude to voice dialogue</label>
+      Budget $<input id="budget" type="number" step="0.5" style="width:80px" onchange="post('/api/settings',{budget_usd:+this.value})"></div>
+    <h2>Danger zone</h2>
+    <button class="danger" onclick="if(confirm('Erase all history and start a new family story?'))ctl('reset')">Reset world</button>
+  </div>
+</div>
+<div class="card" style="margin-top:12px"><h2>Family members</h2><div id="editors" class="grid5"></div>
+  <h2 style="margin-top:12px">Add a family member</h2>
+  <div class="row"><input id="newName" placeholder="Name"><input id="newAge" type="number" placeholder="Age" style="width:70px">
+    <input id="newRole" placeholder="Role (e.g. Grandmother)"><button onclick="addMember()">Add</button></div></div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tfmt = t => `D${Math.floor(t/1440)+1} ${String(Math.floor(t%1440/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;
+const EMOTIONS = ["happiness","sadness","anger","frustration","excitement","jealousy","fear","anxiety","love","affection","pride",
+                  "guilt","loneliness","surprise","curiosity","disappointment","gratitude"];
+const REL = ["trust","affection","respect","frustration","understanding","closeness"];
+let S = null, feed = [], bubbles = [], banner = null, activeTab = 'family', lastConvCount = 0;
+
+async function post(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})});
+  if (!r.ok) alert(await r.text());
+  return r.json();
+}
+const ctl = a => post('/api/control/' + a);
+const instruct = (text, target) => text.trim() && post('/api/instruct', {text, target});
+const agent = id => S.agents.find(a => a.id === id);
+const color = id => (agent(id) || {}).color || '#8a8984';
+const name = id => id === 'controller' ? 'World Controller' : (agent(id) || {}).name || id;
+
+// ---------------------------------------------------------------- live connection
+function connect() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = m => {
+    const msg = JSON.parse(m.data), first = !S;
+    S = msg.state;
+    for (const it of msg.items) {
+      if (it.kind === 'event') feed.push(it);
+      if (it.kind === 'conv') queueBubbles(it.lines, it.room);
+    }
+    feed = feed.slice(-600);
+    if (first) setup();
+    renderHeader(); renderFeed(); renderTab(msg.items.some(i => i.kind === 'conv'));
+  };
+  ws.onclose = () => setTimeout(connect, 1000);
+}
+
+function queueBubbles(lines, room) {
+  const now = performance.now();
+  const start = Math.max(now, ...bubbles.map(b => b.end - 400));
+  lines.forEach((l, i) => {
+    const b = {speaker:l.speaker, text:l.text, start:start + i*1700, end:start + i*1700 + 2300};
+    if (l.speaker === 'controller') banner = b; else bubbles.push(b);
+  });
+}
+
+async function setup() {
+  feed = (await (await fetch('/api/events?limit=300')).json());
+  const tabs = ['family','conversations','emotions','relationships','tasks','memory','reports','control'];
+  $('tabs').innerHTML = tabs.map(t => `<button data-t="${t}" onclick="showTab('${t}')">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
+  $('emoPick').innerHTML = EMOTIONS.map(e => `<option>${e}</option>`).join('');
+  $('relKey').innerHTML = REL.map(e => `<option>${e}</option>`).join('');
+  fillAgentSelects();
+  const ex = ["Good morning, everyone. It's a new day. Let's get started.", "Rajesh, focus on your financial planning today.",
+    "Lakshmi, organize the household and make sure everyone is prepared for tomorrow.",
+    "Arjun, you have an important assignment. Complete it before playing games.",
+    "Priya, help your younger sister with her homework.", "Anu, finish your homework and surprise everyone with something creative."];
+  $('examples').innerHTML = ex.map(e => `<button class="note" onclick="instText.value=this.textContent">${esc(e)}</button>`).join('');
+  const evs = {exam_results:'📝 Exam results', power_cut:'🕯 Power cut', guest_visit:'🧳 Guests coming', work_pressure:'💼 Work pressure',
+               bonus:'💰 Bonus', broken_vase:'🏺 Broken vase', anu_fever:'🤒 Anu has fever'};
+  $('eventBtns').innerHTML = Object.entries(evs).map(([k,v]) => `<button onclick="post('/api/event',{kind:'${k}'})">${v}</button>`).join('');
+  const sc = {exam_pressure:'📚 Exam pressure', mother_overload:'😩 Mother overloaded', son_excels:'🏆 Arjun excels', festival:'🌼 Onam prep'};
+  $('scenarioBtns').innerHTML = Object.entries(sc).map(([k,v]) => `<button onclick="post('/api/scenario',{name:'${k}'})">${v}</button>`).join('');
+  $('speed').value = String(S.speed);
+  showTab('family');
+  requestAnimationFrame(draw);
+}
+
+function fillAgentSelects() {
+  const opts = S.agents.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  for (const id of ['convAgent','taskAgent','instTarget']) { const keep = $(id).options[0].outerHTML; $(id).innerHTML = keep + opts; }
+  for (const id of ['relFrom','memAgent','taskOwner']) $(id).innerHTML = opts;
+  renderEditors();
+}
+
+function renderHeader() {
+  $('clock').textContent = `Day ${S.day+1} · ${S.weekday} · ${S.clock}`;
+  $('status').textContent = S.running ? 'running' : 'paused';
+  $('status').className = 'pill' + (S.running ? ' on' : '');
+  const c = S.cost, st = S.settings;
+  const on = st.llm_enabled && st.llm_available;
+  $('llm').textContent = on ? `Claude on · $${c.usd.toFixed(3)} / $${st.budget_usd}` : (st.llm_available ? 'Claude off' : 'No API key: rule-based voices');
+  $('llm').className = 'pill' + (on ? ' on' : '');
+}
+
+function renderFeed() {
+  const hide = $('hideMoves').checked, el = $('feed');
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  el.innerHTML = feed.filter(e => !(hide && e.type === 'move')).slice(-250)
+    .map(e => `<div class="ev ${e.type}"><time>${tfmt(e.t).slice(-5)}</time>${esc(e.text)}</div>`).join('');
+  if (stick) el.scrollTop = el.scrollHeight;
+}
+
+function showTab(t) {
+  activeTab = t;
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + t));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  renderTab(true, true);
+}
+
+let lastSlow = 0;
+function renderTab(newConvs, force) {
+  if (activeTab === 'family') renderMembers();
+  if (activeTab === 'conversations' && (newConvs || force)) loadConvs();
+  if (activeTab === 'tasks') renderTasks();
+  if (activeTab === 'control') renderControl(force);
+  const slow = performance.now() - lastSlow > 5000;  // heavier tabs refresh at most every 5 s
+  if (activeTab === 'emotions' && (force || slow)) { lastSlow = performance.now(); loadEmotionChart(); renderEmoTable(); }
+  if (activeTab === 'relationships' && (force || slow)) { lastSlow = performance.now(); renderRelGraph(); loadRelChart(); renderRelTable(); renderConflicts(); }
+  if (activeTab === 'memory' && force) loadMemory();
+  if (activeTab === 'reports' && force) loadReports();
+}
+
+// ---------------------------------------------------------------- family overview
+function renderMembers() {
+  $('members').innerHTML = S.agents.map(a => `
+    <div class="card member">
+      <div class="top"><div class="avatar" style="border-color:${a.color}">${a.avatar}</div>
+        <div><b>${esc(a.name)}</b>, ${a.age}<div class="note">${esc(a.role)}</div></div>
+        <div style="margin-left:auto;font-size:26px" title="${a.mood} ${a.mood_level}">${a.emoji}</div></div>
+      <div class="kv">Location: <b>${a.location === 'outside' ? esc(a.place || 'Outside') : esc(S.rooms[a.location])}</b></div>
+      <div class="kv">Activity: <b>${esc(a.activity)}</b></div>
+      <div class="kv">Feeling: <b>${a.mood}</b>${a.mood_level ? ' (' + a.mood_level + ')' : ''}</div>
+      <div class="kv">Current goal: <b>${esc(a.goal)}</b></div>
+      <div class="kv">Tasks completed today: <b>${a.completion}%</b></div><div class="bar"><i style="width:${a.completion}%;background:${a.color}"></i></div>
+      <div class="kv">Energy: <b>${Math.round(a.energy*100)}%</b></div><div class="bar"><i style="width:${a.energy*100}%;background:#8a8984"></i></div>
+      ${a.thought ? `<div class="thought">💭 ${esc(a.thought)}</div>` : ''}
+    </div>`).join('');
+}
+
+// ---------------------------------------------------------------- conversations
+async function loadConvs() {
+  const q = new URLSearchParams({agent:$('convAgent').value, q:$('convQ').value});
+  const rows = await (await fetch('/api/conversations?' + q)).json();
+  $('convs').innerHTML = rows.map(c => `
+    <div class="conv"><div class="meta">${tfmt(c.t)} · ${c.room === 'controller' ? 'from the controller' : esc(S.rooms[c.room] || c.room)} · ${esc(c.topic)}
+      ${c.private ? ' · 🔒 private' : ''} · voiced by ${esc(c.voiced_by)}</div>
+      ${c.lines.map(l => `<div class="line"><b style="border-bottom:2px solid ${color(l.speaker)}">${esc(l.name)}</b>: ${esc(l.text)}</div>`).join('')}
+      ${c.context.memories ? `<div class="note" style="margin-top:4px">Who remembers it: ${Object.entries(c.context.memories).map(([id, [how, text]]) =>
+        `<span title="${esc(text)}"><b>${esc(name(id))}</b> (${how})</span>`).join(' · ')}</div>` : ''}
+      <details><summary>Context behind this conversation</summary><pre>${esc(JSON.stringify(c.context, null, 2))}</pre></details></div>`).join('')
+    || '<p class="note">No conversations yet. Start the simulation.</p>';
+}
+
+// ---------------------------------------------------------------- charts (SVG, hover crosshair, direct labels)
+function lineChart(el, series, {yMax = 1, height = 260} = {}) {
+  const W = el.clientWidth || 700, H = height, L = 36, R = 92, T = 10, B = 26;
+  const pts = series.flatMap(s => s.points);
+  if (!pts.length) { el.innerHTML = '<p class="note">No history yet. It builds up as the simulation runs.</p>'; return; }
+  const t0 = Math.min(...pts.map(p => p[0])), t1 = Math.max(...pts.map(p => p[0])) || t0 + 1;
+  const x = t => L + (t - t0) / Math.max(1, t1 - t0) * (W - L - R), y = v => T + (1 - v / yMax) * (H - T - B);
+  let svg = `<svg width="${W}" height="${H}" role="img">`;
+  for (let i = 0; i <= 4; i++) { const v = yMax * i / 4;
+    svg += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#ecebe6"/><text x="${L-6}" y="${y(v)+4}" font-size="11" fill="#8a8984" text-anchor="end">${v.toFixed(2)}</text>`; }
+  for (let t = Math.ceil(t0/360)*360; t <= t1; t += 360)
+    svg += `<text x="${x(t)}" y="${H-8}" font-size="11" fill="#8a8984" text-anchor="middle">${tfmt(t)}</text>`;
+  const labels = [];
+  for (const s of series) {
+    if (!s.points.length) continue;
+    svg += `<path d="${s.points.map((p,i) => (i?'L':'M') + x(p[0]).toFixed(1) + ' ' + y(p[1]).toFixed(1)).join('')}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    const last = s.points[s.points.length-1];
+    labels.push({y:y(last[1]), name:s.name, color:s.color, x:x(last[0])});
+  }
+  labels.sort((a,b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i-1].y + 13);
+  for (const l of labels) svg += `<circle cx="${l.x}" cy="${l.y}" r="0"/><line x1="${W-R+4}" x2="${W-R+14}" y1="${l.y}" y2="${l.y}" stroke="${l.color}" stroke-width="3"/>
+      <text x="${W-R+18}" y="${l.y+4}" font-size="12" fill="#52514e">${esc(l.name)}</text>`;
+  svg += `<line id="xh" y1="${T}" y2="${H-B}" stroke="#52514e" stroke-dasharray="3 3" visibility="hidden"/>
+          <rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="transparent"/></svg><div class="tip"></div>`;
+  el.innerHTML = svg;
+  const tip = el.querySelector('.tip'), xh = el.querySelector('#xh'), times = [...new Set(pts.map(p => p[0]))].sort((a,b) => a-b);
+  el.querySelector('rect').onmousemove = e => {
+    const r = el.getBoundingClientRect(), mx = e.clientX - r.left;
+    const t = times.reduce((best, tt) => Math.abs(x(tt) - mx) < Math.abs(x(best) - mx) ? tt : best, times[0]);
+    xh.setAttribute('x1', x(t)); xh.setAttribute('x2', x(t)); xh.setAttribute('visibility', 'visible');
+    tip.style.display = 'block'; tip.style.left = Math.min(x(t) + 10, W - 170) + 'px'; tip.style.top = '10px';
+    tip.innerHTML = `<b>${tfmt(t)}</b><br>` + series.map(s => { const p = s.points.find(p => p[0] === t);
+      return p ? `<span class="sw" style="background:${s.color}"></span>${esc(s.name)}: ${p[1].toFixed(2)}` : ''; }).filter(Boolean).join('<br>');
+  };
+  el.querySelector('rect').onmouseleave = () => { tip.style.display = 'none'; xh.setAttribute('visibility', 'hidden'); };
+}
+
+async function loadEmotionChart() {
+  const e = $('emoPick').value, hist = await (await fetch('/api/history/emotion')).json();
+  lineChart($('emoChart'), S.agents.map(a => ({name:a.name, color:a.color,
+    points:hist.filter(h => h.data[a.id]).map(h => [h.t, h.data[a.id][e]])})));
+}
+
+function renderEmoTable() {
+  const cell = v => `<td class="num" style="background:rgba(42,120,214,${(v*0.75).toFixed(2)});color:${v > .55 ? '#fff' : 'inherit'}">${v.toFixed(2)}</td>`;
+  $('emoTable').innerHTML = `<table><tr><th></th>${EMOTIONS.map(e => `<th style="font-size:11px">${e}</th>`).join('')}</tr>` +
+    S.agents.map(a => `<tr><td><b>${esc(a.name)}</b> ${a.emoji}</td>${EMOTIONS.map(e => cell(a.emotions[e])).join('')}</tr>`).join('') + '</table>';
+}
+
+// ---------------------------------------------------------------- relationships
+function warmthColor(w) {  // diverging: red ← gray → blue
+  const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const gray = [184,182,174], blue = [42,120,214], red = [227,73,72];
+  const c = w >= 0 ? lerp(gray, blue, Math.min(1, w / 0.7)) : lerp(gray, red, Math.min(1, -w / 0.4));
+  return `rgb(${c})`;
+}
+function renderRelGraph() {
+  const el = $('relGraph'), W = el.clientWidth || 460, H = 380, cx = W/2, cy = H/2, R = Math.min(W, H)/2 - 50;
+  const pos = {}; S.agents.forEach((a, i) => { const t = -Math.PI/2 + i * 2*Math.PI / S.agents.length; pos[a.id] = [cx + R*Math.cos(t), cy + R*Math.sin(t)]; });
+  let svg = `<svg width="${W}" height="${H}"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3.5" markerHeight="3.5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8a8984"/></marker></defs>`;
+  for (const [k, r] of Object.entries(S.rel)) {
+    const [a, b] = k.split('|'); if (!pos[a] || !pos[b]) continue;
+    const [x1,y1] = pos[a], [x2,y2] = pos[b], dx = x2-x1, dy = y2-y1, d = Math.hypot(dx, dy);
+    const ox = -dy/d*10, oy = dx/d*10, sx = x1 + dx/d*28 + ox, sy = y1 + dy/d*28 + oy, ex = x2 - dx/d*30 + ox, ey = y2 - dy/d*30 + oy;
+    const w = r.affection - r.frustration - 0.45;
+    svg += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${warmthColor(w)}" stroke-width="${1 + r.closeness*5}" marker-end="url(#ar)" opacity=".9">
+      <title>${name(a)} → ${name(b)}\n${REL.map(k => k + ': ' + r[k].toFixed(2)).join('\n')}</title></line>`;
+  }
+  for (const a of S.agents) { const [x,y] = pos[a.id];
+    svg += `<circle cx="${x}" cy="${y}" r="24" fill="#fff" stroke="${a.color}" stroke-width="3"/><text x="${x}" y="${y+7}" text-anchor="middle" font-size="20">${a.avatar}</text>
+            <text x="${x}" y="${y+42}" text-anchor="middle" font-size="12" fill="#0b0b0b">${esc(a.name)} ${a.emoji}</text>`; }
+  el.innerHTML = svg + '</svg><div class="note">Hover a line for exact values.</div>';
+}
+async function loadRelChart() {
+  const from = $('relFrom').value, key = $('relKey').value, hist = await (await fetch('/api/history/rel')).json();
+  lineChart($('relChart'), S.agents.filter(a => a.id !== from).map(a => ({name:a.name, color:a.color,
+    points:hist.filter(h => h.data[`${from}|${a.id}`]).map(h => [h.t, h.data[`${from}|${a.id}`][key]])})), {height:220});
+}
+function renderRelTable() {
+  $('relTable').innerHTML = `<table><tr><th>From → To</th>${REL.map(k => `<th>${k}</th>`).join('')}</tr>` +
+    Object.entries(S.rel).map(([k, r]) => { const [a,b] = k.split('|');
+      return `<tr><td>${esc(name(a))} → ${esc(name(b))}</td>${REL.map(x => `<td class="num">${r[x].toFixed(2)}</td>`).join('')}</tr>`; }).join('') + '</table>';
+}
+function renderConflicts() {
+  $('conflicts').innerHTML = S.conflicts.length ? '<table>' + S.conflicts.slice().reverse().map(c =>
+    `<tr><td>${tfmt(c.t)}</td><td>${esc(name(c.a))} vs ${esc(name(c.b))}</td><td>${esc(c.topic)}</td><td>severity ${c.severity}</td>
+     <td>${c.resolved ? '✅ reconciled ' + tfmt(c.resolved_t) : '⚠️ unresolved'}</td></tr>`).join('') + '</table>' : '<p class="note">No arguments so far.</p>';
+}
+
+// ---------------------------------------------------------------- tasks & improvement
+function renderTasks() {
+  const now = S.t, rows = S.agents.map(a => {
+    const ts = S.tasks.filter(t => t.owner === a.id), c = s => ts.filter(t => t.status === s).length;
+    const overdue = ts.filter(t => t.status === 'pending' && t.due - now < 120).length;
+    return `<tr><td><span class="sw" style="background:${a.color}"></span>${esc(a.name)}</td><td class="num">${ts.length}</td><td class="num">${c('done')}</td>
+      <td class="num">${c('pending')}</td><td class="num">${c('failed')}</td><td class="num">${overdue}</td>
+      <td>${(a.completion_history||[]).map(r => `<span title="${r}" style="display:inline-block;width:10px;height:${4+r*20}px;background:${a.color};margin-right:2px;vertical-align:bottom"></span>`).join('') || '—'}</td></tr>`; });
+  $('taskSummary').innerHTML = `<table><tr><th>Member</th><th>Tasks (last 3 days)</th><th>Done</th><th>Pending</th><th>Failed</th><th>Due &lt; 2h</th><th>Daily completion rate (per day)</th></tr>${rows.join('')}</table>`;
+  const verdict = c => c.status === 'true' ? '✅ true' : c.status === 'false' ? '❌ false' : '⏳ open';
+  const kinds = {done:'said it was done', on_track:'said it was nearly done', promise:'promised to do it'};
+  $('claims').innerHTML = `<table><tr><th>Member</th><th>Claims</th><th>True</th><th>False</th><th>Open</th><th>Reliability</th></tr>` +
+    S.agents.map(a => { const c = a.claims, n = c.kept + c.broken;
+      return `<tr><td><span class="sw" style="background:${a.color}"></span>${esc(a.name)}</td><td class="num">${c.made}</td><td class="num">${c.kept}</td>
+        <td class="num">${c.broken}</td><td class="num">${c.open}</td><td class="num">${n ? Math.round(100 * c.kept / n) + '%' : '—'}</td></tr>`; }).join('') + '</table>' +
+    `<h3 style="font-size:13px;margin:10px 0 4px">Recent claims</h3><table><tr><th>When</th><th>Who</th><th>Said</th><th>About</th><th>Real progress then</th><th>Outcome</th></tr>` +
+    S.claims.slice().reverse().slice(0, 15).map(c => `<tr><td>${tfmt(c.t)}</td><td>${esc(name(c.agent))}${c.to ? ' → ' + esc(name(c.to)) : ' → controller'}</td>
+      <td>“${esc(c.said)}” <span class="note">(${kinds[c.kind]})</span></td><td>${esc(c.title)}</td><td class="num">${Math.round(c.progress * 100)}%</td>
+      <td>${verdict(c)}${c.actual ? ` <span class="note">task ${c.actual} ${tfmt(c.verified_t)}</span>` : ''}</td></tr>`).join('') + '</table>';
+  $('improve').innerHTML = S.agents.map(a => `<div style="margin-bottom:10px"><b>${esc(a.name)}</b>
+     <span class="note">habit modifiers: ${Object.entries(a.modifiers).map(([k,v]) => `${k} ${v>=0?'+':''}${v}`).join(' · ')}</span>
+     <div class="grid5" style="margin-top:4px">${a.goals.map(g => `<div><div class="kv">${esc(g.title)}: <b>${g.value}/${g.target}</b></div>
+        <div class="bar"><i style="width:${Math.min(100, g.value/g.target*100)}%;background:${a.color}"></i></div></div>`).join('')}</div>
+     ${a.lessons.map(l => `<div class="kv">📘 “${esc(l.text)}” <b>${l.status}</b> · baseline ${l.baseline_rate}${l.measured_rate !== undefined ? ' → measured ' + l.measured_rate : ''}
+        <span class="note">(${esc(l.evidence.join('; '))})</span></div>`).join('') || '<div class="note">No lessons yet.</div>'}</div>`).join('');
+  const who = $('taskAgent').value, st = $('taskStatus').value;
+  const list = S.tasks.filter(t => (!who || t.owner === who) && (!st || (st === 'overdue soon' ? t.status === 'pending' && t.due - now < 120 : t.status === st)))
+    .sort((a,b) => b.created - a.created);
+  $('taskList').innerHTML = `<table><tr><th>Owner</th><th>Task</th><th>Kind</th><th>Priority</th><th>Due</th><th>Progress</th><th>Status</th><th>Source</th><th>Postponed</th></tr>` +
+    list.map(t => `<tr><td>${esc(name(t.owner))}</td><td>${esc(t.title)}</td><td>${t.kind}</td><td class="num">${t.priority}</td><td>${tfmt(t.due)}</td>
+      <td style="min-width:90px"><div class="bar"><i style="width:${t.progress*100}%;background:${color(t.owner)}"></i></div></td>
+      <td>${t.status === 'done' ? '✅ done' : t.status === 'failed' ? '❌ failed' : '⏳ pending'}</td><td>${t.source}</td><td class="num">${t.procrastinated}</td></tr>`).join('') + '</table>';
+}
+
+// ---------------------------------------------------------------- memory explorer
+async function loadMemory() {
+  const id = $('memAgent').value; if (!id) return;
+  const m = await (await fetch('/api/memory/' + id)).json(), mem = m.memory;
+  const all = [...mem.episodic, ...mem.short].filter((x, i, arr) => arr.findIndex(y => y.t === x.t && y.text === x.text) === i);
+  const li = arr => arr.length ? '<ul>' + arr.slice().reverse().map(x => `<li><time>${x.t ? tfmt(x.t) : 'before'}</time>${esc(x.text)}
+      ${x.importance >= .6 ? ' ⭐' : ''}</li>`).join('') + '</ul>' : '<p class="note">Nothing yet.</p>';
+  $('memory').innerHTML = `<div class="two"><div>
+    <h3>⭐ Important events (episodic)</h3>${li(mem.episodic.filter(x => ['event','background','secret','achievement','failure'].includes(x.kind)))}
+    <h3>💬 Conversations remembered</h3>${li(all.filter(x => x.kind === 'conversation').slice(-25))}
+    <h3>🙋 Personal experiences</h3>${li(all.filter(x => ['achievement','failure','observation','instruction'].includes(x.kind)).slice(-20))}</div><div>
+    <h3>👨‍👩‍👧‍👦 Family experiences</h3>${li(all.filter(x => x.kind === 'event' && x.who.length > 1))}
+    <h3>📘 Lessons learned</h3>${m.lessons.length ? '<ul>' + m.lessons.map(l => `<li>${esc(l.text)} (<b>${l.status}</b>)<br><span class="note">${esc(l.evidence.join('; '))}</span></li>`).join('') + '</ul>' : '<p class="note">None yet.</p>'}
+    <h3>❤️ Relationship memories</h3>${li(all.filter(x => x.who.length && (x.importance >= .5)).slice(-15))}
+    <h3>🗓 Long-term memory (daily summaries)</h3>${li(mem.long)}
+    <h3>⏱ Short-term memory (last 25 observations)</h3>${li(mem.short)}</div></div>`;
+}
+
+// ---------------------------------------------------------------- reports
+async function loadReports() {
+  const days = await (await fetch('/api/reports')).json(), cur = $('repDay').value;
+  $('repDay').innerHTML = days.map(d => `<option value="${d}">Day ${d+1}</option>`).join('');
+  if (!days.length) { $('report').innerHTML = '<p class="note">The first report is written at midnight of Day 1. Use speed "max" to get there quickly.</p>'; return; }
+  $('repDay').value = cur !== '' && days.includes(+cur) ? cur : days[days.length-1];
+  loadReport();
+}
+async function loadReport() {
+  const r = await (await fetch('/api/report/' + $('repDay').value)).json();
+  $('report').innerHTML = mdToHtml(r.markdown);
+}
+function mdToHtml(md) {
+  let html = '', inList = 0;
+  for (const raw of md.split('\n')) {
+    const line = esc(raw).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/_(.+?)_/g, '<i>$1</i>');
+    const m = line.match(/^(\s*)- (.*)/);
+    if (m) { const lvl = m[1].length ? 2 : 1; while (inList < lvl) { html += '<ul>'; inList++; } while (inList > lvl) { html += '</ul>'; inList--; } html += `<li>${m[2]}</li>`; continue; }
+    while (inList) { html += '</ul>'; inList--; }
+    const h = line.match(/^(#+) (.*)/);
+    html += h ? `<h${h[1].length}>${h[2]}</h${h[1].length}>` : line ? `<p>${line}</p>` : '';
+  }
+  return html;
+}
+const dl = fmt => { const d = $('repDay').value; if (d) location.href = `/api/report/${d}?fmt=${fmt}`; };
+
+// ---------------------------------------------------------------- control panel
+function renderControl(force) {
+  if (!force) return;
+  $('setDay').value = S.day + 1; $('setTime').value = S.clock;
+  $('llmOn').checked = S.settings.llm_enabled; $('budget').value = S.settings.budget_usd;
+  const c = S.cost;
+  $('llmInfo').innerHTML = S.settings.llm_available
+    ? `API key found. Calls: <b>${c.calls}</b> · tokens in/out: <b>${c.input_tokens}/${c.output_tokens}</b> · spend: <b>$${c.usd.toFixed(4)}</b>`
+    : `No ANTHROPIC_API_KEY set. Everything runs on the rule-based engine, which costs nothing. Set the key and restart to let Claude voice the dialogue.`;
+  renderEditors();
+}
+function renderEditors() {
+  $('editors').innerHTML = S.agents.map(a => `<div class="card" data-id="${a.id}">
+    <div class="row"><span class="avatar" style="border-color:${a.color};width:32px;height:32px;font-size:18px">${a.avatar}</span>
+      <input name="name" value="${esc(a.name)}" style="width:110px"><input name="age" type="number" value="${a.age}" style="width:60px"></div>
+    <div class="row"><input name="role" value="${esc(a.role)}" style="flex:1"></div>
+    <div class="row">Model <select name="model">${S.settings.models.map(m => `<option ${m === a.model ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+    ${Object.entries(a.traits).map(([k, v]) => `<div class="row" style="margin:2px 0"><span style="width:120px" class="note">${k}</span>
+      <input name="t_${k}" type="range" min="0" max="1" step="0.05" value="${v}" style="flex:1"></div>`).join('')}
+    <button onclick="saveAgent('${a.id}')">Save</button></div>`).join('');
+}
+function saveAgent(id) {
+  const el = document.querySelector(`#editors [data-id="${id}"]`), v = n => el.querySelector(`[name="${n}"]`).value;
+  const traits = {}; el.querySelectorAll('input[type=range]').forEach(r => traits[r.name.slice(2)] = +r.value);
+  post('/api/agent/' + id, {name:v('name'), age:+v('age'), role:v('role'), model:v('model'), traits}).then(() => setTimeout(fillAgentSelects, 300));
+}
+function addMember() {
+  post('/api/agent', {name:$('newName').value, age:+$('newAge').value, role:$('newRole').value}).then(() => setTimeout(fillAgentSelects, 300));
+}
+function assignTask() {
+  post('/api/task', {owner:$('taskOwner').value, title:$('taskTitle').value, kind:$('taskKind').value, priority:+$('taskPrio').value,
+                     due_hours:+$('taskDue').value, effort:+$('taskEffort').value});
+  $('taskTitle').value = '';
+}
+function setClock() {
+  const [h, m] = $('setTime').value.split(':').map(Number);
+  post('/api/settings', {day:+$('setDay').value - 1, minute:h*60 + m});
+}
+
+// ---------------------------------------------------------------- the house (canvas)
+const cv = $('house'), g = cv.getContext('2d');
+const ROOMS = { parents_bedroom:[20,20,280,170], kids_bedroom:[300,20,260,170], study:[560,20,200,170], balcony:[760,20,180,170],
+  living_room:[20,190,380,200], dining:[400,190,220,200], kitchen:[620,190,320,200], entrance:[20,390,200,70] };
+const OUTSIDE = { Office:[260,480,220,70], College:[490,480,220,70], School:[720,480,220,70] };
+const SEATS = { dining:[[438,248],[582,248],[438,342],[582,342],[510,232]], living_room:[[70,300],[165,300],[260,300],[355,300],[355,240]] };
+const posNow = {};
+const actIcon = a => /sleep/i.test(a) ? '💤' : /breakfast|lunch|dinner|meal|eat|tea/i.test(a) ? '🍽' : /talking/i.test(a) ? '💬'
+  : /working on|study|homework|assignment|revise/i.test(a) ? '📚' : /cook|clean|laundry|chore/i.test(a) ? '🧹' : /tv|game|phone|play|relax/i.test(a) ? '🎮' : '';
+let caption = '', storyCur = -1;
+let replay = null, replayIdx = 0, replayPlaying = false, lastReplayStep = 0, recorder = null;
+
+function furniture() {
+  g.fillStyle = '#d9cdb8';
+  g.fillRect(40, 60, 110, 80); g.fillRect(320, 60, 60, 100); g.fillRect(470, 60, 60, 100);  // beds
+  g.fillRect(590, 50, 140, 30);  // desk
+  g.fillStyle = '#c9d8c0'; g.fillRect(40, 300, 160, 40);  // sofa
+  g.fillStyle = '#d9cdb8'; g.fillRect(450, 260, 120, 60);  // dining table
+  g.fillStyle = '#cfcfd4'; g.fillRect(820, 210, 110, 30); g.fillRect(640, 210, 60, 30);  // stove & counter
+  g.fillStyle = '#b9d3e6'; g.fillRect(250, 220, 120, 10);  // TV
+  g.fillStyle = '#a8c98f'; for (const x of [790, 830, 870, 905]) { g.beginPath(); g.arc(x, 165, 10, 0, 7); g.fill(); }  // balcony plants
+}
+
+function drawHouse(minute) {
+  g.fillStyle = '#e9e6df'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#d7e3cf'; g.fillRect(0, 468, cv.width, 92);
+  for (const [id, [x,y,w,h]] of Object.entries(ROOMS)) {
+    g.fillStyle = id === 'balcony' ? '#eef3e6' : id === 'kitchen' ? '#f6f1e7' : '#fbf9f4';
+    g.fillRect(x, y, w, h); g.strokeStyle = '#8f8a7e'; g.lineWidth = 3; g.strokeRect(x, y, w, h);
+  }
+  furniture();
+  g.font = '600 12px system-ui'; g.fillStyle = '#6b675e';
+  for (const [id, [x,y]] of Object.entries(ROOMS)) g.fillText(S.rooms[id].toUpperCase(), x + 8, y + 16);
+  for (const [n, [x,y,w,h]] of Object.entries(OUTSIDE)) {
+    g.fillStyle = '#f4f2ec'; g.fillRect(x, y, w, h); g.strokeStyle = '#b0ab9f'; g.lineWidth = 1; g.strokeRect(x, y, w, h);
+    g.fillStyle = '#6b675e'; g.fillText((n === 'Office' ? '🏢 ' : n === 'College' ? '🎓 ' : '🏫 ') + n.toUpperCase(), x + 8, y + 16);
+  }
+  g.fillStyle = '#6b675e'; g.fillText('OUTSIDE THE HOUSE', 20, 500);
+  const night = minute < 330 ? 0.35 : minute < 390 ? 0.35 * (390 - minute) / 60 : minute > 1260 ? Math.min(0.35, (minute - 1260) / 120 * 0.35) : 0;
+  if (night) { g.fillStyle = `rgba(20,30,70,${night})`; g.fillRect(0, 0, cv.width, cv.height); }
+}
+
+function targets(people) {
+  const byPlace = {}, out = {};
+  for (const p of people) { const key = p.loc === 'outside' ? 'out:' + (p.place || 'Office') : p.loc; (byPlace[key] = byPlace[key] || []).push(p.id); }
+  for (const [key, ids] of Object.entries(byPlace)) {
+    const r = key.startsWith('out:') ? OUTSIDE[key.slice(4)] || OUTSIDE.Office : ROOMS[key] || ROOMS.living_room;
+    ids.forEach((id, i) => { if (SEATS[key] && SEATS[key][i]) return out[id] = SEATS[key][i]; const cols = key.startsWith('out:') ? 3 : Math.max(2, Math.floor(r[2] / 95));
+      out[id] = [r[0] + 48 + (i % cols) * 92, r[1] + (key.startsWith('out:') ? 45 : 70) + Math.floor(i / cols) * 70]; });
+  }
+  return out;
+}
+
+function wrap(text, max) {
+  const words = text.split(' '), lines = []; let cur = '';
+  for (const w of words) { if (g.measureText(cur + ' ' + w).width > max && cur) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
+  return lines.concat(cur).slice(0, 4);
+}
+function bubble(x, y, text) {
+  g.font = '12px system-ui'; const lines = wrap(text, 190), w = Math.max(...lines.map(l => g.measureText(l).width)) + 14, h = lines.length * 15 + 8;
+  const bx = Math.min(Math.max(4, x - w/2), cv.width - w - 4), by = Math.max(4, y - 34 - h);
+  g.fillStyle = 'rgba(255,255,255,.96)'; g.strokeStyle = '#52514e'; g.lineWidth = 1;
+  g.beginPath(); g.roundRect(bx, by, w, h, 6); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(x - 5, by + h); g.lineTo(x, by + h + 7); g.lineTo(x + 5, by + h); g.fill();
+  g.fillStyle = '#0b0b0b'; lines.forEach((l, i) => g.fillText(l, bx + 7, by + 16 + i * 15));
+}
+
+function draw(now) {
+  requestAnimationFrame(draw);
+  if (!S) return;
+  let people, minute, speech = [];
+  if (replay) {
+    if (replayPlaying && now - lastReplayStep > 250 && replayIdx < replay.frames.length - 1) { replayIdx++; lastReplayStep = now; $('scrub').value = replayIdx; }
+    const f = replay.frames[replayIdx]; if (!f) return;
+    minute = f.t % 1440; $('replayTime').textContent = tfmt(f.t);
+    people = Object.entries(f.data).map(([id, d]) => ({id, ...d, emoji:EMO[d.mood] || '🙂'}));
+    const c = replay.convs.find(c => c.t === f.t);
+    const recent = replay.convs.filter(x => x.t <= f.t && f.t - x.t <= 20 && x.initiator !== 'controller').pop();
+    if (recent) caption = `Why: ${name(recent.initiator)} ${recent.reason}` + (recent.tension > 0.55 ? ' — it became an argument' : '');
+    else caption = '';
+    highlightStory(f.t);
+    if (c) c.lines.forEach((l, i) => i === Math.floor(now / 1500) % c.lines.length && speech.push({speaker:l.speaker, text:`${l.name}: ${l.text}`}));
+  } else {
+    minute = S.minute;
+    people = S.agents.map(a => ({id:a.id, loc:a.location, place:a.place, act:a.activity, emoji:a.emoji}));
+    bubbles = bubbles.filter(b => b.end > now);
+    speech = bubbles.filter(b => b.start <= now).map(b => ({speaker:b.speaker, text:b.text}));
+  }
+  drawHouse(minute);
+  const tg = targets(people);
+  for (const p of people) {
+    const t = tg[p.id], cur = posNow[p.id] || (posNow[p.id] = [...t]);
+    cur[0] += (t[0] - cur[0]) * 0.08; cur[1] += (t[1] - cur[1]) * 0.08;
+    const a = agent(p.id) || {color:'#888', avatar:'🙂', name:p.id}, [x, y] = cur;
+    g.fillStyle = 'rgba(0,0,0,.12)'; g.beginPath(); g.ellipse(x, y + 20, 16, 5, 0, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.strokeStyle = a.color; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 19, 0, 7); g.fill(); g.stroke();
+    g.font = '20px system-ui'; g.textAlign = 'center'; g.fillText(a.avatar, x, y + 7);
+    g.font = '16px system-ui'; g.fillText(p.emoji, x + 18, y - 12);
+    const icon = actIcon(p.act || ''); if (icon) { g.font = '13px system-ui'; g.fillText(icon, x - 20, y - 12); }
+    g.font = '600 11px system-ui'; g.fillStyle = '#0b0b0b'; g.fillText(a.name, x, y + 34);
+    g.font = '10px system-ui'; g.fillStyle = '#52514e'; g.fillText((p.act || '').replace('Working on: ', '').slice(0, 16), x, y + 46);
+    g.textAlign = 'left';
+  }
+  for (const s of speech) { const p = posNow[s.speaker]; if (p) bubble(p[0], p[1], s.text); }
+  if (replay && caption) {
+    g.font = '600 12px system-ui'; const w = Math.min(920, g.measureText(caption).width + 24);
+    g.fillStyle = 'rgba(11,11,11,.78)'; g.beginPath(); g.roundRect((cv.width - w)/2, 6, w, 24, 8); g.fill();
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(caption.slice(0, 140), cv.width/2, 22); g.textAlign = 'left';
+  }
+  if (!replay && banner && banner.end + 2500 > now) {
+    g.font = '600 13px system-ui'; const w = Math.min(900, g.measureText(banner.text).width + 30);
+    g.fillStyle = 'rgba(98,80,214,.95)'; g.beginPath(); g.roundRect((cv.width - w)/2, 6, w, 26, 8); g.fill();
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText('📣 ' + banner.text.slice(0, 120), cv.width/2, 24); g.textAlign = 'left';
+  }
+  g.font = '11px system-ui'; g.fillStyle = 'rgba(0,0,0,.45)';
+  g.fillText(`${replay ? 'REPLAY' : 'LIVE'} · Day ${(replay ? Math.floor(replay.frames[replayIdx]?.t / 1440) : S.day) + 1} ${String(Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')} · schematic view of simulated state`, 236, 465);
+}
+const EMO = {happiness:'😊',sadness:'😢',anger:'😠',frustration:'😤',excitement:'🤩',jealousy:'😒',fear:'😨',anxiety:'😟',love:'🥰',affection:'🤗',
+  pride:'😌',guilt:'😔',loneliness:'🥺',surprise:'😮',curiosity:'🤔',disappointment:'😞',gratitude:'🙏',calm:'🙂',asleep:'😴'};
+
+async function toggleReplay() {
+  if (replay) { replay = null; $('story').style.display = 'none'; $('replayCtl').style.display = 'none'; $('replayBtn').textContent = '⏮ Replay a day'; $('vizmode').textContent = 'live'; return; }
+  $('replayDay').innerHTML = Array.from({length:S.day + 1}, (_, d) => `<option value="${d}">Day ${d+1}</option>`).join('');
+  $('replayDay').value = S.day; $('replayCtl').style.display = 'flex'; $('replayBtn').textContent = '⏹ Back to live'; $('vizmode').textContent = 'replay';
+  await loadReplay();
+}
+async function loadReplay() {
+  const d = $('replayDay').value;
+  const [frames, story] = await Promise.all([fetch('/api/history/frame?day=' + d).then(r => r.json()), fetch('/api/story?day=' + d).then(r => r.json())]);
+  replay = {frames, convs:story.convs, story}; replayIdx = 0; $('scrub').max = Math.max(0, frames.length - 1); $('scrub').value = 0;
+  $('story').style.display = 'block'; renderStory();
+}
+const KEY_TOPICS = ['ask_studies', 'conflict', 'apologize', 'vent', 'offer_help', 'seek_help', 'share_achievement', 'instruction'];
+const EV_ICON = {event:'⚡', relationship:'🤝', claim:'🔍', carryover:'🌅', learning:'📘', controller:'📣', task:'⏰'};
+function renderStory() {
+  if (!replay) return;
+  const {convs, events, conflicts} = replay.story, key = $('keyOnly').checked;
+  $('fights').innerHTML = conflicts.length ? conflicts.map(c => `<div class="fight">⚡ <b>${esc(name(c.a))} vs ${esc(name(c.b))}</b> at ${tfmt(c.t)} about ${esc(c.topic)}
+      (severity ${c.severity})<div class="why">Why: ${esc(c.cause || 'not recorded')}</div>
+      <div class="why">${c.resolved ? `How it ended: ${esc(c.resolved_how || 'reconciled')} at ${tfmt(c.resolved_t)}` :
+        `Still unresolved${c.attempts ? ` (${c.attempts.length} apology attempt(s) rejected)` : ''}`}</div></div>`).join('')
+    : '<p class="note">No arguments this day.</p>';
+  const items = [
+    ...convs.filter(c => !key || KEY_TOPICS.includes(c.topic) || c.tension > 0.4).map(c => ({t:c.t, icon:c.tension > 0.55 ? '💥' : c.topic === 'apologize' ? '🤝' : '💬',
+      text:c.initiator === 'controller' ? `Controller: ${c.summary}` : `${name(c.initiator)} → ${c.participants.filter(p => p !== c.initiator).map(name).join(', ')}: ${c.summary}`,
+      why:c.reason ? `why: ${name(c.initiator)} ${c.reason}` : ''})),
+    ...events.map(e => ({t:e.t, icon:EV_ICON[e.type] || '•', text:e.text, why:''}))].sort((a, b) => a.t - b.t);
+  replay.items = items; storyCur = -1;
+  $('storyList').innerHTML = items.map((m, i) => `<div class="mo" id="mo${i}" onclick="seek(${m.t})"><time>${tfmt(m.t)}</time>${m.icon} ${esc(m.text)}
+    ${m.why ? `<div class="why">${esc(m.why)}</div>` : ''}</div>`).join('') || '<p class="note">Nothing recorded for this day.</p>';
+}
+function seek(t) {
+  const i = replay.frames.findIndex(f => f.t >= t);
+  replayIdx = i < 0 ? replay.frames.length - 1 : i; $('scrub').value = replayIdx;
+}
+function highlightStory(t) {
+  const items = replay.items || [];
+  let i = -1; while (i + 1 < items.length && items[i + 1].t <= t) i++;
+  if (i === storyCur) return;
+  $('mo' + storyCur)?.classList.remove('cur'); storyCur = i;
+  const el = $('mo' + i), box = $('storyList'); if (el) { el.classList.add('cur'); box.scrollTop = el.offsetTop - box.offsetTop - 80; }
+}
+function screenshot() {
+  cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `family-world-${S.day+1}-${S.clock.replace(':','')}.png`; a.click(); });
+}
+function toggleRecord() {
+  if (recorder) { recorder.stop(); return; }
+  const chunks = [], stream = cv.captureStream(30);
+  recorder = new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4'});
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, {type:recorder.mimeType}));
+    a.download = `family-world-day${S.day+1}.${recorder.mimeType.includes('mp4') ? 'mp4' : 'webm'}`; a.click(); recorder = null; $('recBtn').textContent = '⏺ Record video'; };
+  recorder.start(); $('recBtn').textContent = '⏹ Stop recording';
+}
+
+connect();
+</script>
+</body>
+</html>
