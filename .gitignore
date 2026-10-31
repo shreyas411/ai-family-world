@@ -5,3 +5,4 @@ web3d/node_modules/
 server.log
 .DS_Store
 .env
+bench_results.json

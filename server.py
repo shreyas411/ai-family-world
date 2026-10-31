@@ -29,7 +29,7 @@ def snapshot():
         top = max((t for t in tasks if t["status"] == "pending"), key=lambda t: (t["priority"], -t["due"]), default=None)
         agents.append(dict(
             id=a["id"], name=a["name"], age=a["age"], role=a["role"], avatar=a["avatar"], color=a["color"],
-            model=a["model"], traits=a["traits"], location=a["location"], place=a["place"], activity=a["activity"],
+            model=a["model"], model_complex=a["model_complex"], traits=a["traits"], location=a["location"], place=a["place"], activity=a["activity"],
             mood=mood, mood_level=level, emoji=W.EMOJI[mood], emotions=a["emotions"], energy=round(a["energy"], 2),
             goal=(cur or top or {}).get("title", "—"), thought=a["thought"],
             completion=round(100 * done / len(tasks)) if tasks else 100, modifiers=a["modifiers"],
@@ -39,7 +39,8 @@ def snapshot():
     return dict(t=s["t"], day=day, minute=minute, clock=W.hhmm(minute), weekday=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
                                                                               "Sun"][day % 7],
                 running=s["running"], speed=s["speed"], agents=agents, rel=s["rel"], cost=s["cost"],
-                settings=dict(s["settings"], llm_available=llm.available(), models=llm.MODELS),
+                settings=dict(s["settings"], llm_available=llm.available(), models=llm.MODELS, languages=list(llm.LANGUAGES),
+                              model_ready={m: llm.ready(m) for m in llm.MODELS}, month_usd=llm.month_usd(world)),
                 tasks=[t for t in s["tasks"]], conflicts=s["conflicts"][-30:], claims=s["claims"][-60:], rooms=W.ROOMS)
 
 
@@ -133,7 +134,7 @@ async def settings(body: dict = Body(...)):
                 world.start_day(day)
             s["t"] = day * 1440 + minute
             world.log("controller", f"Clock set to Day {day + 1}, {W.hhmm(minute)}.")
-    for k in ("llm_enabled", "budget_usd"):
+    for k in ("llm_enabled", "budget_usd", "fallback_model", "language"):
         if k in body:
             s["settings"][k] = body[k]
     world.save()

@@ -89,6 +89,7 @@
     <option value="3">slow (3 s/tick)</option><option value="1">normal (1 s/tick)</option>
     <option value="0.4">fast</option><option value="0.1">very fast</option><option value="0.05">max</option></select></label>
   <span class="pill" id="llm" title="LLM status and spend">LLM</span>
+  <label title="Read new conversations aloud with the browser's built-in voices"><input type="checkbox" id="speak" onchange="toggleSpeak(this.checked)"> 🔊 Speak</label>
   <span style="flex:1"></span>
   <input id="quick" placeholder="Say something to the family… (Enter)" style="width:340px"
          onkeydown="if(event.key==='Enter'){instruct(this.value,'');this.value=''}">
@@ -207,8 +208,11 @@
     <h2>Scenarios</h2><div class="row" id="scenarioBtns"></div>
     <h2>LLM &amp; cost</h2>
     <div id="llmInfo" class="kv"></div>
-    <div class="row"><label><input type="checkbox" id="llmOn" onchange="post('/api/settings',{llm_enabled:this.checked})"> Use Claude to voice dialogue</label>
-      Budget $<input id="budget" type="number" step="0.5" style="width:80px" onchange="post('/api/settings',{budget_usd:+this.value})"></div>
+    <div class="row"><label><input type="checkbox" id="llmOn" onchange="post('/api/settings',{llm_enabled:this.checked})"> Use LLM to voice dialogue</label>
+      Monthly budget $<input id="budget" type="number" step="0.5" style="width:80px" onchange="post('/api/settings',{budget_usd:+this.value})">
+      Fallback <select id="fallback" onchange="post('/api/settings',{fallback_model:this.value})"></select>
+      Language <select id="language" onchange="post('/api/settings',{language:this.value})"></select></div>
+    <div id="usage"></div>
     <h2>Danger zone</h2>
     <button class="danger" onclick="if(confirm('Erase all history and start a new family story?'))ctl('reset')">Reset world</button>
   </div>
@@ -247,7 +251,7 @@ function connect() {
     S = msg.state;
     for (const it of msg.items) {
       if (it.kind === 'event') feed.push(it);
-      if (it.kind === 'conv') queueBubbles(it.lines, it.room);
+      if (it.kind === 'conv') { queueBubbles(it.lines, it.room); speakLines(it.lines); }
     }
     feed = feed.slice(-600);
     if (first) setup();
@@ -265,6 +269,32 @@ function queueBubbles(lines, room) {
   });
 }
 
+// Spoken dialogue via the browser's speechSynthesis: no server cost, but needs an installed voice for the language.
+const VOICE_LANG = {English: 'en-IN', Tamil: 'ta-IN', Tanglish: 'en-IN'};  // Tanglish is Latin script, so an Indian English voice reads it
+function toggleSpeak(on) {
+  localStorage.speak = on ? '1' : '';
+  if (!on) return speechSynthesis.cancel();
+  const lang = VOICE_LANG[S.settings.language] || 'en-IN';
+  if (!speechSynthesis.getVoices().some(v => v.lang.replace('_', '-').startsWith(lang.slice(0, 2))))
+    alert(`No ${lang} voice is installed in this browser/OS, so a default voice will be used. ` +
+          `On macOS add one under System Settings → Accessibility → Spoken Content → System voice → Manage Voices (Tamil).`);
+}
+function speakLines(lines) {
+  // ponytail: drops conversations that arrive while one is still being read, so audio never lags far behind the sim
+  if (!$('speak').checked || replayPlaying || speechSynthesis.speaking) return;
+  const lang = VOICE_LANG[S.settings.language] || 'en-IN';
+  const voice = speechSynthesis.getVoices().find(v => v.lang.replace('_', '-') === lang)
+             || speechSynthesis.getVoices().find(v => v.lang.startsWith(lang.slice(0, 2)));
+  for (const l of lines) {
+    const a = S.agents.find(x => x.id === l.speaker), u = new SpeechSynthesisUtterance(l.text);
+    u.lang = lang; if (voice) u.voice = voice;
+    const female = a && /mother|wife|daughter|sister|aunt/i.test(a.role);  // pitch by age and role so speakers sound different
+    u.pitch = !a ? 1 : a.age < 12 ? 1.6 : (a.age < 25 ? 1.1 : 0.85) + (female ? 0.25 : 0);
+    u.rate = a && a.age < 12 ? 1.1 : 1;
+    speechSynthesis.speak(u);
+  }
+}
+
 async function setup() {
   feed = (await (await fetch('/api/events?limit=300')).json());
   const tabs = ['family','conversations','emotions','relationships','tasks','memory','reports','control'];
@@ -272,6 +302,7 @@ async function setup() {
   $('emoPick').innerHTML = EMOTIONS.map(e => `<option>${e}</option>`).join('');
   $('relKey').innerHTML = REL.map(e => `<option>${e}</option>`).join('');
   fillAgentSelects();
+  $('speak').checked = !!localStorage.speak;
   const ex = ["Good morning, everyone. It's a new day. Let's get started.", "Rajesh, focus on your financial planning today.",
     "Lakshmi, organize the household and make sure everyone is prepared for tomorrow.",
     "Arjun, you have an important assignment. Complete it before playing games.",
@@ -300,8 +331,18 @@ function renderHeader() {
   $('status').className = 'pill' + (S.running ? ' on' : '');
   const c = S.cost, st = S.settings;
   const on = st.llm_enabled && st.llm_available;
-  $('llm').textContent = on ? `Claude on · $${c.usd.toFixed(3)} / $${st.budget_usd}` : (st.llm_available ? 'Claude off' : 'No API key: rule-based voices');
+  $('llm').textContent = on ? `LLM on · $${st.month_usd.toFixed(3)} / $${st.budget_usd} this month` : (st.llm_available ? 'LLM off' : 'No API key: rule-based voices');
   $('llm').className = 'pill' + (on ? ' on' : '');
+  if (activeTab === 'control') renderUsage();
+}
+function renderUsage() {  // live API usage, per member and per model
+  const c = S.cost, name = id => (S.agents.find(a => a.id === id) || {name: id}).name;
+  const row = (label, b) => `<tr><td>${esc(label)}</td><td>${b.calls}</td><td>${b.input_tokens}</td><td>${b.cached_tokens || 0}</td>
+    <td>${b.output_tokens}</td><td>${b.calls ? Math.round(b.ms / b.calls) : '—'}</td><td>$${b.usd.toFixed(4)}</td></tr>`;
+  const head = first => `<tr><th>${first}</th><th>calls</th><th>in</th><th>cached</th><th>out</th><th>avg ms</th><th>est. $</th></tr>`;
+  const ag = Object.entries(c.by_agent || {}), md = Object.entries(c.by_model || {});
+  $('usage').innerHTML = ag.length ? `<table>${head('Member')}${ag.map(([id, b]) => row(name(id), b)).join('')}</table>
+    <table>${head('Model')}${md.map(([m, b]) => row(m, b)).join('')}</table>` : '';
 }
 
 function renderFeed() {
@@ -535,11 +576,15 @@ const dl = fmt => { const d = $('repDay').value; if (d) location.href = `/api/re
 function renderControl(force) {
   if (!force) return;
   $('setDay').value = S.day + 1; $('setTime').value = S.clock;
-  $('llmOn').checked = S.settings.llm_enabled; $('budget').value = S.settings.budget_usd;
-  const c = S.cost;
-  $('llmInfo').innerHTML = S.settings.llm_available
-    ? `API key found. Calls: <b>${c.calls}</b> · tokens in/out: <b>${c.input_tokens}/${c.output_tokens}</b> · spend: <b>$${c.usd.toFixed(4)}</b>`
-    : `No ANTHROPIC_API_KEY set. Everything runs on the rule-based engine, which costs nothing. Set the key and restart to let Claude voice the dialogue.`;
+  const st = S.settings;
+  $('llmOn').checked = st.llm_enabled; $('budget').value = st.budget_usd;
+  $('fallback').innerHTML = ['', ...st.models].map(m => `<option value="${m}" ${m === st.fallback_model ? 'selected' : ''}>${m || 'none'}${m && !st.model_ready[m] ? ' (no key)' : ''}</option>`).join('');
+  $('language').innerHTML = st.languages.map(l => `<option ${l === st.language ? 'selected' : ''}>${l}</option>`).join('');
+  const ready = st.models.filter(m => st.model_ready[m]);
+  $('llmInfo').innerHTML = st.llm_available
+    ? `Usable models: <b>${ready.join(', ')}</b> · this month: <b>$${st.month_usd.toFixed(4)}</b> of $${st.budget_usd} · all time: <b>$${(S.cost.usd || 0).toFixed(4)}</b>`
+    : `No ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY set. Everything runs on the rule-based engine, which costs nothing. Set a key and restart to let an LLM voice the dialogue.`;
+  renderUsage();
   renderEditors();
 }
 function renderEditors() {
@@ -548,6 +593,7 @@ function renderEditors() {
       <input name="name" value="${esc(a.name)}" style="width:110px"><input name="age" type="number" value="${a.age}" style="width:60px"></div>
     <div class="row"><input name="role" value="${esc(a.role)}" style="flex:1"></div>
     <div class="row">Model <select name="model">${S.settings.models.map(m => `<option ${m === a.model ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+    <div class="row">Complex <select name="model_complex">${S.settings.models.map(m => `<option ${m === a.model_complex ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
     ${Object.entries(a.traits).map(([k, v]) => `<div class="row" style="margin:2px 0"><span style="width:120px" class="note">${k}</span>
       <input name="t_${k}" type="range" min="0" max="1" step="0.05" value="${v}" style="flex:1"></div>`).join('')}
     <button onclick="saveAgent('${a.id}')">Save</button></div>`).join('');
@@ -555,7 +601,7 @@ function renderEditors() {
 function saveAgent(id) {
   const el = document.querySelector(`#editors [data-id="${id}"]`), v = n => el.querySelector(`[name="${n}"]`).value;
   const traits = {}; el.querySelectorAll('input[type=range]').forEach(r => traits[r.name.slice(2)] = +r.value);
-  post('/api/agent/' + id, {name:v('name'), age:+v('age'), role:v('role'), model:v('model'), traits}).then(() => setTimeout(fillAgentSelects, 300));
+  post('/api/agent/' + id, {name:v('name'), age:+v('age'), role:v('role'), model:v('model'), model_complex:v('model_complex'), traits}).then(() => setTimeout(fillAgentSelects, 300));
 }
 function addMember() {
   post('/api/agent', {name:$('newName').value, age:+$('newAge').value, role:$('newRole').value}).then(() => setTimeout(fillAgentSelects, 300));

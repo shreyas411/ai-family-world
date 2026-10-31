@@ -33,13 +33,15 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requi
 # without uv: python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
-Optional: `export ANTHROPIC_API_KEY=...` before starting. Claude then voices the dialogue and parses instructions. Without a key, everything still runs on the rule-based engine at no cost.
+Optional: `export ANTHROPIC_API_KEY=...` (and/or `OPENAI_API_KEY`, `GEMINI_API_KEY`) before starting. An LLM then voices the dialogue and parses instructions. Without a key, everything still runs on the rule-based engine at no cost.
 
 ## Usage
 
 ```bash
 .venv/bin/python server.py          # → http://localhost:8000 (3D house at /3d/)
 .venv/bin/python test_sim.py        # headless 4-day run with assertions (DAYS=7 for longer)
+.venv/bin/python test_llm.py        # LLM gateway: routing, provider fallback, metering, monthly budget (no network)
+.venv/bin/python bench.py claude-haiku-5-5 claude-sonnet-5-5 --judge claude-sonnet-5-5   # compare models on identical scenarios
 ```
 
 1. Open http://localhost:8000 and press **Start**. The clock advances 10 simulated minutes per tick, and the speed is adjustable.
@@ -54,13 +56,21 @@ State is saved to `world.db`, so the world continues after a restart. **Reset wo
 ```
 server.py   FastAPI: REST + WebSocket push, async tick loop, serves the dashboard
 world.py    The simulation: clock, schedules, decisions, emotions, relationships, tasks, memory, learning, events, reports
-llm.py      Optional Claude layer (dialogue voicing + instruction parsing), cost metering, budget cap
+llm.py      Optional LLM gateway (Anthropic / OpenAI / Google): dialogue voicing + instruction parsing, model routing,
+            provider fallback, per-agent token + cost metering, monthly budget cap
+bench.py    Benchmarks models on identical seeded scenarios: format checks, judge score, latency, cost
 static/index.html   Dashboard: canvas house, feed, 8 tabs, replay, screenshot, video recording
 world.db    SQLite: world state (JSON), event log, conversations, history frames, daily reports
 ```
 
 **Deterministic engine, LLM only for language.** Every state change (who goes where, who talks, whether an argument happens, how emotions and relationships move) is decided in `world.py` from personality, emotion, memory, relationship and task state. Claude only rewrites the engine's draft lines into natural speech. As a result:
-- costs are bounded: at most one call per conversation, plus one per controller instruction, against a hard USD budget
+- costs are bounded: at most one call per conversation, plus one per controller instruction, against a monthly USD budget
+- routing: routine talk and instructions use each member's `model` (default Claude Haiku 5.5); arguments, apologies and high-tension moments use their `model_complex` (default Claude Sonnet 5.5). Both are set per member in the controller
+- if a model's provider fails, the call is retried once on the configurable fallback model (default `gemini-2.5-flash`), then falls back to the rule-based lines
+- each prompt carries only the speakers' top 4 relevant memories, no conversation history; daily reports are built from the event log with no LLM call
+- **🔊 Speak** (dashboard header) reads new conversations aloud with the browser's speech synthesis: free, no server call. Tamil lines use a `ta-IN` voice, English and Tanglish an `en-IN` voice, and pitch varies by age and role so members sound different. For Tamil on macOS, add a Tamil voice under System Settings → Accessibility → Spoken Content → System voice → Manage Voices; on Windows, add the Tamil language pack with speech; Chrome on Android usually has one built in
+- dialogue language: **English** (Indian English, default), **Tamil** (Tamil script) or **Tanglish** (Tamil-English mix in Latin script), set under *LLM & cost* in the controller. It only applies to LLM-voiced lines; without an API key the template dialogue stays in English. Benchmark a language with `LANGUAGE=Tamil .venv/bin/python bench.py ...`
+- the controller shows live calls, tokens (including cached), average latency and estimated cost per member and per model
 - the simulation is reproducible from its seed, and it can't run away into endless agent-to-agent loops
 - it works offline
 
@@ -102,7 +112,8 @@ Start, pause, resume, stop, reset, single-step, speed, and set day/time. You can
 
 ## Known limitations
 
-- Dialogue without an API key comes from templates: varied, but repetitive over many days.
+- Dialogue without an API key comes from templates: varied, but repetitive over many days, and English only (Tamil needs an LLM).
+- Spoken audio uses the browser's built-in voices, so quality depends on the OS. Tamil needs a Tamil voice installed (otherwise a default voice mispronounces it). Conversations that arrive while one is still being read are skipped, and replay and the 3D view are silent.
 - With Claude on, a single call voices all speakers in a conversation. The prompt passes each speaker only their own memories, but it is one model writing every voice.
 - Weekends drop school and office but have no special routines yet. No meals or money are tracked as resources.
 - Video is a browser canvas recording, not generated footage. PDF export uses the browser's print dialog.

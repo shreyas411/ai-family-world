@@ -52,7 +52,7 @@ def S(*rows):
 def _agent(id, name, age, role, avatar, color, traits, baseline, schedule, leisure, goals, memories, daily):
     emotions = {e: 0.05 for e in EMOTIONS}
     emotions.update(baseline)
-    return dict(id=id, name=name, age=age, role=role, avatar=avatar, color=color, model=llm.DEFAULT_MODEL,
+    return dict(id=id, name=name, age=age, role=role, avatar=avatar, color=color, model=llm.DEFAULT_MODEL, model_complex=llm.COMPLEX_MODEL,
                 traits=traits, baseline=dict(emotions), emotions=dict(emotions), schedule=schedule,
                 leisure=leisure, goals=goals, daily=daily, location="parents_bedroom", place="",
                 activity="Sleeping", thought="", energy=0.9, current_task=None,
@@ -208,6 +208,10 @@ class World:
         row = self.db.execute("SELECT json FROM state WHERE id=1").fetchone()
         self.s = json.loads(row[0]) if row else self.fresh()
         self.s.setdefault("claims", [])
+        self.s["settings"].setdefault("fallback_model", llm.FALLBACK_MODEL)  # worlds saved before the gateway
+        self.s["settings"].setdefault("language", "English")
+        for a in self.s["agents"].values():
+            a.setdefault("model_complex", llm.COMPLEX_MODEL)
         self.s["running"] = False  # never auto-run after restart; controller presses start
         self.outbox = []  # events/convs since last drain, pushed to websocket clients
         if not row:
@@ -218,7 +222,8 @@ class World:
         agents = default_agents()
         s = dict(t=330, seed=seed, running=False, speed=1.0, agents={a["id"]: a for a in agents},
                  rel=initial_relationships(agents), tasks=[], next_id=1, conflicts=[], stats={},
-                 cooldowns={}, settings=dict(llm_enabled=llm.available(), budget_usd=2.0),
+                 cooldowns={}, settings=dict(llm_enabled=llm.available(), budget_usd=2.0, fallback_model=llm.FALLBACK_MODEL,
+                               language="English"),
                  cost=dict(calls=0, input_tokens=0, output_tokens=0, usd=0.0), day_start={}, pending_share={}, claims=[])
         self.s = s
         self.start_day(0)
@@ -796,9 +801,10 @@ class World:
                    tension=round(tension, 2), observers=[o["id"] for o in observers], memories=memories)
         voiced = "template"
         if self.llm_ok():
-            out = llm.voice(self, a, b, participants, topic, res["summary"], lines, ctx)
+            complex = bool(conflict) or topic in ("conflict", "apologize") or tension > 0.55
+            out = llm.voice(self, a, b, participants, topic, res["summary"], lines, ctx, complex)
             if out:
-                lines, voiced = out, a["model"]
+                lines, voiced = out
         cur = self.db.execute(
             "INSERT INTO convs(t, room, topic, initiator, participants, private, lines, context, summary, voiced_by) "
             "VALUES(?,?,?,?,?,?,?,?,?,?)", (self.s["t"], room, topic, aid, json.dumps(participants), 0,
@@ -1191,7 +1197,7 @@ class World:
     # ---------- controller
     def llm_ok(self):
         st = self.s["settings"]
-        return st["llm_enabled"] and llm.available() and self.s["cost"]["usd"] < st["budget_usd"]
+        return st["llm_enabled"] and llm.available() and llm.month_usd(self) < st["budget_usd"]
 
     def instruct(self, text, target=None):
         """Natural-language instruction from the World Controller. Agents turn it into goals - or push back."""
@@ -1253,7 +1259,7 @@ class World:
     def update_agent(self, aid, patch):
         with self.lock:
             a = self.A(aid)
-            for k in ("name", "age", "role", "avatar", "model", "leisure"):
+            for k in ("name", "age", "role", "avatar", "model", "model_complex", "leisure"):
                 if k in patch:
                     a[k] = patch[k]
             for k, v in patch.get("traits", {}).items():
